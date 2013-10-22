@@ -229,14 +229,16 @@ func ParseUrlParam(values url.Values, stru interface{}) error {
 	return nil
 }
 
-func ParseBodyParam(body io.ReadCloser, stru interface{}) error {
+func ParseBodyParam(rBody io.ReadCloser, stru interface{}) (body []byte, erro error) {
 	sv := reflect.ValueOf(stru).Elem()
 	st := sv.Type()
 	n := sv.NumField()
 
-	values, err := getPostParams(body)
+	values, tmpBody, err := getPostParams(rBody)
 	if err != nil {
-		return err
+		body = tmpBody
+		erro = err
+		return
 	}
 
 	for i := 0; i < n; i++ {
@@ -266,11 +268,13 @@ func ParseBodyParam(body io.ReadCloser, stru interface{}) error {
 					if lenTagStr > 7 && oneTag[5:6] == "[" && oneTag[lenTagStr-1:lenTagStr] == "]" {
 						ti.RangeStr = oneTag[6 : lenTagStr-1]
 					} else {
-						return errors.New(fmt.Sprintf("invalid tag \"%s\"", oneTag))
+						erro = errors.New(fmt.Sprintf("invalid tag \"%s\"", oneTag))
+						return
 					}
 
 				} else {
-					return errors.New(fmt.Sprintf("invalid tag \"%s\"", oneTag))
+					erro = errors.New(fmt.Sprintf("invalid tag \"%s\"", oneTag))
+					return
 				}
 			}
 		}
@@ -284,17 +288,20 @@ func ParseBodyParam(body io.ReadCloser, stru interface{}) error {
 		case reflect.String:
 			if value == "" {
 				if ti.OmitEmpty == false {
-					return errors.New(fmt.Sprintf("field \"%s\" is empty", stField.Name))
+					erro = errors.New(fmt.Sprintf("field \"%s\" is empty", stField.Name))
+					return
 				}
 			} else {
 				if ti.RangeStr != "" {
 					num, err := strconv.Atoi(ti.RangeStr)
 					if err != nil {
-						return errors.New(fmt.Sprintf("invalid tag range \"%s\" error: %v", ti.RangeStr, err))
+						erro = errors.New(fmt.Sprintf("invalid tag range \"%s\" error: %v", ti.RangeStr, err))
+						return
 					}
 
 					if len(value) != num {
-						return errors.New(fmt.Sprintf("field \"%s\" is not %d character", stField.Name, num))
+						erro = errors.New(fmt.Sprintf("field \"%s\" is not %d character", stField.Name, num))
+						return
 					}
 				}
 			}
@@ -308,22 +315,26 @@ func ParseBodyParam(body io.ReadCloser, stru interface{}) error {
 
 			if value == "" {
 				if ti.OmitEmpty == false {
-					return errors.New(fmt.Sprintf("field \"%s\" is empty", stField.Name))
+					err = errors.New(fmt.Sprintf("field \"%s\" is empty", stField.Name))
+					return
 				}
 			} else {
 				if ti.RangeStr != "" {
 					num, err := strconv.Atoi(ti.RangeStr)
 					if err != nil {
-						return errors.New(fmt.Sprintf("invalid tag range \"%s\" error: %v", ti.RangeStr, err))
+						erro = errors.New(fmt.Sprintf("invalid tag range \"%s\" error: %v", ti.RangeStr, err))
+						return
 					}
 
 					data, e = hex.DecodeString(value)
 					if e != nil {
-						return errors.New(fmt.Sprintf("invalid tag \"%s\" error: %v", ti.RangeStr, err))
+						erro = errors.New(fmt.Sprintf("invalid tag \"%s\" error: %v", ti.RangeStr, err))
+						return
 					}
 
 					if len(data) != num {
-						return errors.New(fmt.Sprintf("field \"%s\" is not %d bytes", stField.Name, num))
+						erro = errors.New(fmt.Sprintf("field \"%s\" is not %d bytes", stField.Name, num))
+						return
 					}
 				}
 			}
@@ -332,19 +343,22 @@ func ParseBodyParam(body io.ReadCloser, stru interface{}) error {
 		case reflect.Int:
 			if value == "" {
 				if ti.OmitEmpty == false {
-					return errors.New(fmt.Sprintf("field \"%s\" is empty", stField.Name))
+					erro = errors.New(fmt.Sprintf("field \"%s\" is empty", stField.Name))
+					return
 				}
 			} else {
 				val, err := strconv.Atoi(value)
 				if err != nil {
-					return errors.New(fmt.Sprintf("invalid int value \"%s\" error: %v", value, err))
+					erro = errors.New(fmt.Sprintf("invalid int value \"%s\" error: %v", value, err))
+					return
 				}
 
 				// Verify range
 				if ti.RangeStr != "" {
 					index := strings.Index(ti.RangeStr, ":")
 					if index == -1 {
-						return errors.New(fmt.Sprintf("invalid range tag \"%s\"", ti.RangeStr))
+						erro = errors.New(fmt.Sprintf("invalid range tag \"%s\"", ti.RangeStr))
+						return
 					}
 
 					minStr := ti.RangeStr[:index]
@@ -352,11 +366,13 @@ func ParseBodyParam(body io.ReadCloser, stru interface{}) error {
 					if minStr != "" {
 						min, err := strconv.Atoi(minStr)
 						if err != nil {
-							return errors.New(fmt.Sprintf("invalid tag range \"%s\" error: %v", ti.RangeStr, err))
+							erro = errors.New(fmt.Sprintf("invalid tag range \"%s\" error: %v", ti.RangeStr, err))
+							return
 						}
 
 						if val < min {
-							return errors.New(fmt.Sprintf("field \"%s\" out of range", stField.Name))
+							erro = errors.New(fmt.Sprintf("field \"%s\" out of range", stField.Name))
+							return
 						}
 					}
 
@@ -365,11 +381,13 @@ func ParseBodyParam(body io.ReadCloser, stru interface{}) error {
 					if maxStr != "" {
 						max, err := strconv.Atoi(maxStr)
 						if err != nil {
-							return errors.New(fmt.Sprintf("invalid tag range \"%s\" error: %v", ti.RangeStr, err))
+							erro = errors.New(fmt.Sprintf("invalid tag range \"%s\" error: %v", ti.RangeStr, err))
+							return
 						}
 
 						if val > max {
-							return errors.New(fmt.Sprintf("field \"%s\" out of range", stField.Name))
+							erro = errors.New(fmt.Sprintf("field \"%s\" out of range", stField.Name))
+							return
 						}
 					}
 
@@ -382,19 +400,22 @@ func ParseBodyParam(body io.ReadCloser, stru interface{}) error {
 		case reflect.Int64:
 			if value == "" {
 				if ti.OmitEmpty == false {
-					return errors.New(fmt.Sprintf("field \"%s\" is empty", stField.Name))
+					erro = errors.New(fmt.Sprintf("field \"%s\" is empty", stField.Name))
+					return
 				}
 			} else {
 				val, err := strconv.ParseInt(value, 10, 64)
 				if err != nil {
-					return errors.New(fmt.Sprintf("invalid int value \"%s\" error: %v", value, err))
+					erro = errors.New(fmt.Sprintf("invalid int value \"%s\" error: %v", value, err))
+					return
 				}
 
 				// Verify range
 				if ti.RangeStr != "" {
 					index := strings.Index(ti.RangeStr, ":")
 					if index == -1 {
-						return errors.New(fmt.Sprintf("invalid range tag \"%s\"", ti.RangeStr))
+						erro = errors.New(fmt.Sprintf("invalid range tag \"%s\"", ti.RangeStr))
+						return
 					}
 
 					minStr := ti.RangeStr[:index]
@@ -402,11 +423,13 @@ func ParseBodyParam(body io.ReadCloser, stru interface{}) error {
 					if minStr != "" {
 						min, err := strconv.ParseInt(minStr, 10, 64)
 						if err != nil {
-							return errors.New(fmt.Sprintf("invalid tag range \"%s\" error: %v", ti.RangeStr, err))
+							erro = errors.New(fmt.Sprintf("invalid tag range \"%s\" error: %v", ti.RangeStr, err))
+							return
 						}
 
 						if val < min {
-							return errors.New(fmt.Sprintf("field \"%s\" out of range", stField.Name))
+							erro = errors.New(fmt.Sprintf("field \"%s\" out of range", stField.Name))
+							return
 						}
 					}
 
@@ -415,11 +438,13 @@ func ParseBodyParam(body io.ReadCloser, stru interface{}) error {
 					if maxStr != "" {
 						max, err := strconv.ParseInt(maxStr, 10, 64)
 						if err != nil {
-							return errors.New(fmt.Sprintf("invalid tag range \"%s\" error: %v", ti.RangeStr, err))
+							erro = errors.New(fmt.Sprintf("invalid tag range \"%s\" error: %v", ti.RangeStr, err))
+							return
 						}
 
 						if val > max {
-							return errors.New(fmt.Sprintf("field \"%s\" out of range", stField.Name))
+							erro = errors.New(fmt.Sprintf("field \"%s\" out of range", stField.Name))
+							return
 						}
 					}
 
@@ -431,25 +456,26 @@ func ParseBodyParam(body io.ReadCloser, stru interface{}) error {
 			//case reflect.Float32:
 			//case reflect.Float64:
 		default:
-			return errors.New(fmt.Sprintf("field \"%s\" no this type \"%s\" deal", stField.Name))
+			erro = errors.New(fmt.Sprintf("field \"%s\" no this type \"%s\" deal", stField.Name))
+			return
 
 		}
 	}
 
-	return nil
+	return
 }
 
-func getPostParams(r io.ReadCloser) (map[string]string, error) {
+func getPostParams(r io.ReadCloser) (map[string]string, []byte, error) {
 	body, err := ioutil.ReadAll(r)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer r.Close()
 
 	params := make(map[string]string)
 	bodyTmp, err := url.QueryUnescape(string(body))
 	if err != nil {
-		return nil, err
+		return nil, body, err
 	}
 
 	postParams := strings.Split(string(bodyTmp), "&")
@@ -463,5 +489,5 @@ func getPostParams(r io.ReadCloser) (map[string]string, error) {
 		params[key] = param
 	}
 
-	return params, nil
+	return params, body, nil
 }
