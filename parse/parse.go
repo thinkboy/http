@@ -229,14 +229,14 @@ func ParseUrlParam(values url.Values, stru interface{}) error {
 	return nil
 }
 
-func ParseBodyParam(rBody io.ReadCloser, stru interface{}) (body []byte, erro error) {
+func ParseBodyParam(rBody io.ReadCloser, stru interface{}) (strBody []byte, erro error) {
 	sv := reflect.ValueOf(stru).Elem()
 	st := sv.Type()
 	n := sv.NumField()
 
 	values, tmpBody, err := getPostParams(rBody)
 	if err != nil {
-		body = tmpBody
+		strBody = tmpBody
 		erro = err
 		return
 	}
@@ -466,11 +466,15 @@ func ParseBodyParam(rBody io.ReadCloser, stru interface{}) (body []byte, erro er
 }
 
 func getPostParams(r io.ReadCloser) (map[string]string, []byte, error) {
-	body, err := ioutil.ReadAll(r)
+	bodySlice, err := ioutil.ReadAll(r)
 	if err != nil {
 		return nil, nil, err
 	}
 	defer r.Close()
+
+	body := make([]byte, len(bodySlice))
+
+	copy(body, bodySlice)
 
 	params := make(map[string]string)
 	bodyTmp, err := url.QueryUnescape(string(body))
