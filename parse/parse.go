@@ -315,7 +315,7 @@ func ParseBodyParam(rBody io.ReadCloser, stru interface{}) (body []byte, erro er
 
 			if value == "" {
 				if ti.OmitEmpty == false {
-					err = errors.New(fmt.Sprintf("field \"%s\" is empty", stField.Name))
+					erro = errors.New(fmt.Sprintf("field \"%s\" is empty", stField.Name))
 					return
 				}
 			} else {
