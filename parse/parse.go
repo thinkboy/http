@@ -435,7 +435,6 @@ func getPostParams(r io.ReadCloser) (map[string]string, []byte, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	defer r.Close()
 
 	params := make(map[string]string)
 	bodyTmp, err := url.QueryUnescape(string(body))
